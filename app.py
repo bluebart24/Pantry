@@ -59,6 +59,11 @@ def load_profile():
         session['pantry'] = profiles[profile_name].copy()
     return redirect(url_for('index'))
 
+@app.route('/reset_pantry', methods=['POST'])
+def reset_pantry():
+    session['pantry'] = DEFAULT_PANTRY.copy()
+    return redirect(url_for('index'))
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     recipes = []

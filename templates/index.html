@@ -57,6 +57,14 @@
             </select>
             <label for="max_time" style="margin-left:10px;">Max Prep Time (min):</label>
             <input type="number" id="max_time" name="max_time" min="1" style="width:60px;">
+            <label for="num_recipes" style="margin-left:10px;">Recipes to show:</label>
+            <select id="num_recipes" name="number">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+            </select>
         </div>
         <input type="hidden" name="form_type" value="ingredients">
         <button type="submit">Find Recipes</button>

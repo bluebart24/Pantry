@@ -10,18 +10,18 @@ SPOONACULAR_API_KEY = os.environ.get('SPOONACULAR_API_KEY', '4256ad2a43f448a6bd7
 
 # Common default set of stable pantry ingredients
 DEFAULT_PANTRY = [
-    "salt", "black pepper", "olive oil", "vegetable oil", "canola oil", "flour", "sugar", "brown sugar", "baking powder", "baking soda",
-    "soy sauce", "vinegar", "honey", "mustard", "ketchup", "mayonnaise", "butter", "eggs", "milk", "garlic powder", "onion powder",
-    "dried oregano", "dried basil", "dried thyme", "dried rosemary", "dried parsley", "cinnamon", "nutmeg", "paprika", "red pepper flakes",
-    "rice", "pasta", "breadcrumbs", "cornstarch", "chicken broth", "beef broth", "tomato paste", "peanut butter",
+    "Salt", "Black Pepper", "Olive Oil", "Vegetable Oil", "Canola Oil", "Flour", "Sugar", "Brown Sugar", "Baking Powder", "Baking Soda",
+    "Soy Sauce", "Vinegar", "Honey", "Mustard", "Ketchup", "Mayonnaise", "Butter", "Eggs", "Milk", "Garlic Powder", "Onion Powder",
+    "Dried Oregano", "Dried Basil", "Dried Thyme", "Dried Rosemary", "Dried Parsley", "Cinnamon", "Nutmeg", "Paprika", "Red Pepper Flakes",
+    "Rice", "Pasta", "Breadcrumbs", "Cornstarch", "Chicken Broth", "Beef Broth", "Tomato Paste", "Peanut Butter",
     # Canned and frozen vegetables, meats, and juices
-    "canned corn", "canned green beans", "canned beans", "ground beef", "chicken breasts", "tomato juice", "frozen vegetable mix",
+    "Canned Corn", "Canned Green Beans", "Canned Beans", "Ground Beef", "Chicken Breasts", "Tomato Juice", "Frozen Vegetable Mix",
     # Added sauces and bases
-    "red pasta sauce", "chicken base", "cream of chicken soup", "cream of mushroom soup",
+    "Red Pasta Sauce", "Chicken Base", "Cream Of Chicken Soup", "Cream Of Mushroom Soup",
     # Bean varieties
-    "kidney beans", "black beans", "garbanzo beans",
+    "Kidney Beans", "Black Beans", "Garbanzo Beans",
     # Grains
-    "quinoa"
+    "Quinoa"
 ]
 
 # Simple in-memory cache for recipe lookups
@@ -78,11 +78,18 @@ def index():
         pantry_checked = [i.strip() for i in pantry_for_search.split(',') if i.strip()]
         all_ingredients = list(set(user_ingredients + pantry_checked))
         used_ingredients = all_ingredients
+        # Get number of recipes to show, default 10, increments of 10
+        try:
+            number = int(request.form.get('number', 10))
+            if number < 1:
+                number = 10
+        except Exception:
+            number = 10
         if all_ingredients:
             try:
                 params = {
                     'ingredients': ','.join(all_ingredients),
-                    'number': 5,
+                    'number': number,
                     'apiKey': SPOONACULAR_API_KEY
                 }
                 if diet:

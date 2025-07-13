@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pantry Recipe Finder</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+    .autocomplete-suggestions { border: 1px solid #ccc; background: #fff; position: absolute; z-index: 10; max-height: 150px; overflow-y: auto; width: 300px; }
+    .autocomplete-suggestion { padding: 6px 10px; cursor: pointer; }
+    .autocomplete-suggestion:hover { background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Pantry Recipe Finder</h1>
+    <form method="post" onsubmit="return gatherIngredients()">
+        <label for="ingredient-input">Enter ingredients:</label><br>
+        <div id="ingredient-tags" class="tag-container"></div>
+        <div style="position:relative;">
+            <input type="text" id="ingredient-input" placeholder="Type and press Enter" style="width: 300px;">
+            <div id="autocomplete-list" class="autocomplete-suggestions"></div>
+        </div>
+        <input type="hidden" id="ingredients" name="ingredients">
+        <div style="margin:10px 0;">
+            <strong>Include these pantry items in this search:</strong><br>
+            <div id="pantry-checkboxes" style="max-height:120px;overflow-y:auto;border:1px solid #eee;padding:6px 8px;background:#fafbfc;"></div>
+            <input type="hidden" id="pantry_for_search" name="pantry_for_search">
+        </div>
+        <div style="margin-top:10px;">
+            <label for="diet">Diet:</label>
+            <select id="diet" name="diet">
+                <option value="">Any</option>
+                <option value="vegetarian">Vegetarian</option>
+                <option value="vegan">Vegan</option>
+                <option value="gluten free">Gluten Free</option>
+                <option value="ketogenic">Ketogenic</option>
+                <option value="pescetarian">Pescetarian</option>
+            </select>
+            <label for="cuisine" style="margin-left:10px;">Cuisine:</label>
+            <select id="cuisine" name="cuisine">
+                <option value="">Any</option>
+                <option value="italian">Italian</option>
+                <option value="mexican">Mexican</option>
+                <option value="chinese">Chinese</option>
+                <option value="indian">Indian</option>
+                <option value="american">American</option>
+                <option value="french">French</option>
+                <option value="thai">Thai</option>
+            </select>
+            <label for="type" style="margin-left:10px;">Meal:</label>
+            <select id="type" name="type">
+                <option value="">Any</option>
+                <option value="breakfast">Breakfast</option>
+                <option value="lunch">Lunch</option>
+                <option value="dinner">Dinner</option>
+                <option value="snack">Snack</option>
+                <option value="dessert">Dessert</option>
+            </select>
+            <label for="max_time" style="margin-left:10px;">Max Prep Time (min):</label>
+            <input type="number" id="max_time" name="max_time" min="1" style="width:60px;">
+        </div>
+        <input type="hidden" name="form_type" value="ingredients">
+        <button type="submit">Find Recipes</button>
+    </form>
+    <h2>Pantry Profiles</h2>
+    <form method="post" action="/save_profile" style="display:inline-block; margin-right:20px;">
+        <input type="text" name="profile_name" placeholder="Profile name" required style="width:140px;">
+        <button type="submit">Save Current Pantry as Profile</button>
+    </form>
+    <form method="post" action="/load_profile" style="display:inline-block;">
+        <select name="profile_to_load" required>
+            <option value="" disabled selected>Select profile</option>
+            {% for name in profiles.keys() %}
+                <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Load Profile</button>
+    </form>
+    <h2>Always in Pantry</h2>
+    <form method="post" action="/update_pantry" onsubmit="return gatherPantry()">
+        <div id="pantry-tags" class="tag-container"></div>
+        <input type="text" id="pantry-input" placeholder="Type and press Enter" style="width: 300px;">
+        <input type="hidden" id="pantry_items" name="pantry_items">
+        <button type="submit">Update Pantry</button>
+    </form>
+    <div id="loading-spinner" class="spinner" style="display:none;"></div>
+    <script>
+    const tagContainer = document.getElementById('ingredient-tags');
+    const input = document.getElementById('ingredient-input');
+    let tags = [];
+
+    function renderTags() {
+        tagContainer.innerHTML = '';
+        tags.forEach((tag, idx) => {
+            const tagElem = document.createElement('span');
+            tagElem.className = 'tag';
+            tagElem.textContent = tag;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = () => {
+                tags.splice(idx, 1);
+                renderTags();
+            };
+            tagElem.appendChild(removeBtn);
+            tagContainer.appendChild(tagElem);
+        });
+    }
+
+    const autocompleteList = document.getElementById('autocomplete-list');
+    input.addEventListener('input', async function(e) {
+        const val = input.value.trim();
+        autocompleteList.innerHTML = '';
+        if (val.length < 2) return;
+        try {
+            const resp = await fetch(`/autocomplete_ingredient?q=${encodeURIComponent(val)}`);
+            const suggestions = await resp.json();
+            suggestions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-suggestion';
+                div.textContent = s;
+                div.onclick = () => {
+                    if (!tags.includes(s)) {
+                        tags.push(s);
+                        renderTags();
+                    }
+                    input.value = '';
+                    autocompleteList.innerHTML = '';
+                };
+                autocompleteList.appendChild(div);
+            });
+        } catch {}
+    });
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && input.value.trim()) {
+            e.preventDefault();
+            if (!tags.includes(input.value.trim())) {
+                tags.push(input.value.trim());
+                renderTags();
+            }
+            input.value = '';
+            autocompleteList.innerHTML = '';
+        }
+    });
+    document.addEventListener('click', function(e) {
+        if (!autocompleteList.contains(e.target) && e.target !== input) {
+            autocompleteList.innerHTML = '';
+        }
+    });
+
+    // Pantry tag logic
+    const pantryTagContainer = document.getElementById('pantry-tags');
+    const pantryInput = document.getElementById('pantry-input');
+    let pantryTags = JSON.parse('{{ pantry|tojson|safe }}');
+
+    function renderPantryTags() {
+        pantryTagContainer.innerHTML = '';
+        pantryTags.forEach((tag, idx) => {
+            const tagElem = document.createElement('span');
+            tagElem.className = 'tag';
+            tagElem.textContent = tag;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = () => {
+                pantryTags.splice(idx, 1);
+                renderPantryTags();
+            };
+            tagElem.appendChild(removeBtn);
+            pantryTagContainer.appendChild(tagElem);
+        });
+    }
+
+    pantryInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && pantryInput.value.trim()) {
+            e.preventDefault();
+            if (!pantryTags.includes(pantryInput.value.trim())) {
+                pantryTags.push(pantryInput.value.trim());
+                renderPantryTags();
+            }
+            pantryInput.value = '';
+        }
+    });
+
+    function gatherPantry() {
+        document.getElementById('pantry_items').value = pantryTags.join(',');
+        return true;
+    }
+    renderPantryTags();
+
+    // Pantry checkboxes logic
+    const pantryCheckboxesDiv = document.getElementById('pantry-checkboxes');
+    let pantryCheckboxes = [...pantryTags];
+    function renderPantryCheckboxes() {
+        pantryCheckboxesDiv.innerHTML = '';
+        pantryTags.forEach((item, idx) => {
+            const id = 'pantry_cb_' + idx;
+            const label = document.createElement('label');
+            label.style.marginRight = '10px';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = item;
+            cb.id = id;
+            cb.checked = true;
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(' ' + item));
+            pantryCheckboxesDiv.appendChild(label);
+        });
+    }
+    renderPantryCheckboxes();
+
+    function gatherIngredients() {
+        document.getElementById('ingredients').value = tags.join(',');
+        // Gather checked pantry items
+        const checked = Array.from(pantryCheckboxesDiv.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+        document.getElementById('pantry_for_search').value = checked.join(',');
+        return true;
+    }
+
+    // Show spinner on form submit
+    document.querySelector('form[onsubmit="return gatherIngredients()"]')?.addEventListener('submit', function() {
+        document.getElementById('loading-spinner').style.display = 'block';
+    });
+    </script>
+    {% if error %}
+        <p style="color: red; font-weight: bold;">Error: {{ error }}</p>
+    {% endif %}
+    {% if recipes is defined and recipes|length == 0 and not error %}
+        <p style="color: #b00; font-weight: bold;">No recipes found for your ingredients. Try adding or removing some items!</p>
+    {% endif %}
+    {% if used_ingredients %}
+        <p><strong>Ingredients used for search:</strong> {{ used_ingredients | join(', ') }}</p>
+    {% endif %}
+    {% if recipes %}
+        <h2>Recipe Suggestions</h2>
+        <div class="recipe-grid">
+        {% for recipe in recipes %}
+            <div class="recipe-card">
+                <strong>{{ recipe.title }}</strong><br>
+                <img src="{{ recipe.image }}" alt="{{ recipe.title }}" width="150"><br>
+                <span>Used Ingredients: {{ recipe.usedIngredientCount }}</span><br>
+                <span>Missed Ingredients: {{ recipe.missedIngredientCount }}</span><br>
+                {% if recipe.details.readyInMinutes %}
+                    <span>Prep Time: {{ recipe.details.readyInMinutes }} min</span><br>
+                {% endif %}
+                {% if recipe.details.servings %}
+                    <span>Servings: {{ recipe.details.servings }}</span><br>
+                {% endif %}
+                {% if recipe.details.summary %}
+                    <span>{{ recipe.details.summary|safe }}</span><br>
+                {% endif %}
+                {% if recipe.details.nutrition and recipe.details.nutrition.nutrients %}
+                    <span><strong>Nutrition:</strong></span>
+                    <ul>
+                    {% for n in recipe.details.nutrition.nutrients[:3] %}
+                        <li>{{ n.title }}: {{ n.amount }} {{ n.unit }}</li>
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+                <a href="https://spoonacular.com/recipes/{{ recipe.title | replace(' ', '-') }}-{{ recipe.id }}" target="_blank">View Recipe</a>
+            </div>
+        {% endfor %}
+        </div>
+    {% endif %}
+</body>
+</html> 
